@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>AI 학습 패턴 게임 - 연결 리스트 추가</title>
+    <style>
+        body { text-align: center; font-family: 'Malgun Gothic', sans-serif; background: #f4f7f6; color: #333; }
+        #game-container { position: relative; width: 400px; height: 250px; margin: 30px auto; border: 5px solid #2c3e50; background: white; border-radius: 10px; }
+        .lane { float: left; width: 50%; height: 100%; border-right: 1px dashed #ddd; box-sizing: border-box; }
+        #player { position: absolute; bottom: 30px; width: 60px; height: 60px; background: #3498db; transition: 0.2s; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        #ai { position: absolute; top: 30px; width: 60px; height: 60px; background: #e74c3c; transition: 0.3s; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .info { margin: 20px auto; width: 450px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .memory-tag { display: inline-block; padding: 2px 8px; margin: 2px; background: #eee; border-radius: 4px; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <h2>AI 행동 학습 (배열/딕셔너리/연결리스트)</h2>
+    <div id="game-container">
+        <div class="lane"></div><div class="lane" style="border:none;"></div>
+        <div id="ai" style="left: 70px;">AI</div>
+        <div id="player" style="left: 70px;">나</div>
+    </div>
+
+    <div class="info">
+        <div><strong>결과:</strong> <span id="result">방향키를 눌러 시작하세요!</span></div>
+        <hr>
+        <div><strong>1. 배열 (전체 기록):</strong> <span id="arr-view">[]</span></div>
+        <div><strong>2. 딕셔너리 (빈도):</strong> <span id="dict-view">Left: 0, Right: 0</span></div>
+        <div><strong>3. 연결 리스트 (단기 기억 - 최근 5개):</strong> <br> <span id="list-view">Empty</span></div>
+    </div>
+
+    <script>
+        // --- [연결 리스트 구현] ---
+        class Node {
+            constructor(data) {
+                this.data = data;
+                this.next = null;
+            }
+        }
+
+        class LinkedList {
+            constructor(limit) {
+                this.head = null;
+                this.size = 0;
+                this.limit = limit; // 최대 기억 개수
+            }
+
+            // 새로운 기억 추가 (뒤로 추가)
+            add(data) {
+                const newNode = new Node(data);
+                if (!this.head) {
+                    this.head = newNode;
+                } else {
+                    let current = this.head;
+                    while (current.next) current = current.next;
+                    current.next = newNode;
+                }
+                this.size++;
+
+                // 기억 제한 초과 시 가장 오래된 기억(head) 제거
+                if (this.size > this.limit) {
+                    this.head = this.head.next;
+                    this.size--;
+                }
+            }
+
+            // 현재 기억 리스트를 배열로 반환 (시각화용)
+            toArray() {
+                let arr = [];
+                let current = this.head;
+                while (current) {
+                    arr.push(current.data);
+                    current = current.next;
+                }
+                return arr;
+            }
+        }
+
+        // --- [게임 로직] ---
+        const moveHistory = []; // 배열
+        const patternDict = { "Left": 0, "Right": 0 }; // 딕셔너리
+        const shortMemory = new LinkedList(5); // 연결 리스트 (최근 5개만 기억)
+
+        const positions = { "Left": 70, "Right": 270 };
+
+        document.addEventListener('keydown', (e) => {
+            let move = "";
+            if (e.key === "ArrowLeft") move = "Left";
+            if (e.key === "ArrowRight") move = "Right";
+            if (move) playTurn(move);
+        });
+
+        function playTurn(playerMove) {
+            // AI의 예측 로직
+            // 1. 우선 단기 기억(연결 리스트)에서 가장 많이 나온 쪽을 먼저 의심
+            const recent = shortMemory.toArray();
+            const recentLeft = recent.filter(m => m === "Left").length;
+            const recentRight = recent.filter(m => m === "Right").length;
+
+            let aiMove;
+            if (recentLeft !== recentRight) {
+                aiMove = recentLeft > recentRight ? "Left" : "Right";
+            } else {
+                // 단기 기억이 박빙이면 전체 통계(딕셔너리) 사용
+                aiMove = patternDict["Left"] >= patternDict["Right"] ? "Left" : "Right";
+            }
+
+            // 화면 이동 및 판정
+            document.getElementById('player').style.left = positions[playerMove] + "px";
+            document.getElementById('ai').style.left = positions[aiMove] + "px";
+
+            const result = document.getElementById('result');
+            if (playerMove === aiMove) {
+                result.innerText = "⚠️ AI가 당신의 습관을 읽고 차단했습니다!";
+                result.style.color = "red";
+            } else {
+                result.innerText = "✅ AI를 속였습니다!";
+                result.style.color = "green";
+            }
+
+            // 데이터 업데이트
+            moveHistory.push(playerMove); // 배열 추가
+            patternDict[playerMove]++;    // 딕셔너리 카운트
+            shortMemory.add(playerMove);   // 연결 리스트 추가 (오래된 건 삭제됨)
+
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.getElementById('arr-view').innerText = JSON.stringify(moveHistory.slice(-10)) + "...";
+            document.getElementById('dict-view').innerText = `왼쪽: ${patternDict["Left"]}번, 오른쪽: ${patternDict["Right"]}번`;
+            
+            const listArr = shortMemory.toArray();
+            document.getElementById('list-view').innerHTML = listArr.map(m => `<span class="memory-tag">${m}</span>`).join(" ➔ ");
+        }
+    </script>
+</body>
+</html>
